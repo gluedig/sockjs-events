@@ -56,7 +56,7 @@ class UpdateGetHandler(web.RequestHandler):
         if group not in self.registered_tickers:
             srv_url = str.format('/update/{0}', group)
             TickerRouter = SockJSRouter(self._make_ticker_class(group=group), srv_url)
-            self.application.add_handlers("lb-bun-52", TickerRouter.urls)
+            self.application.add_handlers(".*$", TickerRouter.urls)
             self.registered_tickers[group] = (TickerRouter, srv_url)
             return srv_url
         else:
