@@ -15,14 +15,15 @@ zmq.eventloop.ioloop.os = os
 
 
 zmq_ctx = zmq.Context()
-
+zmq_endpoint = "tcp://localhost:5556"
 
 class TickerConnection(SockJSConnection):
     def _zmq_msg(self, msg):
+        logging.info(msg)
         try:
             msg_obj = json.loads(msg[0])
             logging.info(msg_obj)
-            if 'group' in msg_obj and msg_obj['group'] == self.group:
+            if 'group_id' in msg_obj and msg_obj['group_id'] == self.group:
                 self.send(msg_obj)
         except Exception as ex:
             logging.error(ex)
@@ -31,7 +32,7 @@ class TickerConnection(SockJSConnection):
         logging.info("Ticker open: "+self.group)
         zmq_socket = zmq_ctx.socket(zmq.SUB)
         zmq_socket.setsockopt(zmq.SUBSCRIBE, '')
-        zmq_socket.connect('inproc://#test')
+        zmq_socket.connect(zmq_endpoint)
         self.stream = ZMQStream(zmq_socket)
         self.stream.on_recv(self._zmq_msg)
 
@@ -75,14 +76,15 @@ class TestMainHandler(web.RequestHandler):
     def get(self, group):
         self.render("test.html", group=group)
 
-
-zmq_test_socket = zmq_ctx.socket(zmq.PUB)
-zmq_test_socket.bind('inproc://#test')
+zmq_test_socket = None
+#zmq_test_socket = zmq_ctx.socket(zmq.PUB)
+#zmq_test_socket.bind('tcp://lo:5556')
 class TestMsgHandler(web.RequestHandler):
     n = 0
     def get(self, group):
-        obj = {'msg': 'test', 'group': group, 'n': TestMsgHandler.n}
-        zmq_test_socket.send_json(obj)
+        obj = {'msg': 'test', 'group_id': group, 'n': TestMsgHandler.n}
+        if zmq_test_socket:
+            zmq_test_socket.send_json(obj)
         self.write(str.format("sent n: {0} group: {1}", TestMsgHandler.n, group))
         TestMsgHandler.n += 1
 
