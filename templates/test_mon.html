@@ -1,7 +1,35 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
 <html>
-    <head>
-	<script src="http://cdn.sockjs.org/sockjs-0.3.min.js"></script>
-	<script>
+<head>
+<style>
+
+.node {
+  stroke: #fff;
+  stroke-width: 1.5px;
+  fill: blue;
+}
+
+.link {
+  stroke: #999;
+  stroke-opacity: .6;
+
+}
+</style>
+<script src="http://cdn.sockjs.org/sockjs-0.3.min.js"></script>
+<script>
+graph = new Object();
+graph.nodes  = [
+                {"name":"Hub"},
+                {"name":"Client 1", "value":-56},
+                {"name":"Client 2", "value":-75}
+               ];
+graph.links = [
+               {"source":1, "target":0, "value":-56},
+               {"source":graph.nodes[2], "target":0, "value":-75},
+              ];
+
+/*
    var mon_sock = new SockJS('/monitor/{{mac}}');
    mon_sock.onopen = function() {
        console.log('open');
@@ -12,6 +40,66 @@
    mon_sock.onclose = function() {
        console.log('close');
    };
+*/
 </script>
+
+<script src="http://d3js.org/d3.v3.min.js"></script>
+
 </head>
-<body>Hello {{mac}}</body>
+<title>{{mac}} events</title>
+<body></body>
+<script>
+var width = 960,
+    height = 500;
+
+var color = d3.scale.category20();
+
+var force = d3.layout.force()
+    .charge(-120)
+    .size([width, height]);
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+  force
+      .nodes(graph.nodes)
+      .links(graph.links)
+      .linkDistance(function(d, index) { return 30+(1-d.value); })
+      .start();
+
+  var link = svg.selectAll(".link")
+      .data(graph.links)
+      .enter().append("line")
+      .attr("class", "link");
+      
+
+  var node = svg.selectAll(".node")
+      .data(graph.nodes)
+      .enter().append("circle")
+      .attr("class", "node")
+      .attr("r", 15)
+      .call(force.drag);
+
+  node.append("title")
+      .text(function(d) {
+    	  if (d.value) {
+    	  	return d.name+' RSSI: '+d.value+' dbm';
+    	  } else {
+    		return d.name;
+    	  }
+    	 });
+
+  force.on("tick", function() {
+    link.attr("x1", function(d) { return d.source.x; })
+        .attr("y1", function(d) { return d.source.y; })
+        .attr("x2", function(d) { return d.target.x; })
+        .attr("y2", function(d) { return d.target.y; });
+
+    node.attr("cx", function(d) { return d.x; })
+        .attr("cy", function(d) { return d.y; });
+  });
+
+
+</script>
+</html>
