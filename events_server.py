@@ -72,11 +72,14 @@ class GroupGetHandler(web.RequestHandler):
 
 class MonitorEvents(SockJSConnection):
     def _zmq_msg(self, msg):
-        logging.debug(msg)
+        #logging.debug(msg)
         try:
             msg_obj = json.loads(msg[0])
             logging.debug(msg_obj)
-            if 'mac' in msg_obj and msg_obj['mac'] == self.mac:
+            if self.mac != 'All':
+                if 'mac' in msg_obj and msg_obj['mac'] == self.mac:
+                    self.send(msg_obj)
+            else:
                 self.send(msg_obj)
         except Exception as ex:
             logging.error(ex)
@@ -91,7 +94,7 @@ class MonitorEvents(SockJSConnection):
         self.stream.on_recv(self._zmq_msg)
 
     def on_close(self):
-        logging.debug("Monitor ticker close: "+self.group)
+        logging.debug("Monitor ticker close: "+self.mac)
         self.stream.stop_on_recv()
 
 class MonitorGetHandler(web.RequestHandler):
