@@ -1,52 +1,116 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
-<html>
-<head>
-<style>
+              <html>
+              <head>
+              <style>
 
 .node {
-  stroke: #fff;
-  stroke-width: 1.5px;
-  fill: blue;
+stroke:
+#fff;
+        stroke-width: 1.5px;
+fill:
+        blue;
 }
 
 .link {
-  stroke: #999;
-  stroke-opacity: .6;
+stroke:
+#999;
+stroke-opacity:
+        .6;
 
 }
 </style>
 <script src="http://cdn.sockjs.org/sockjs-0.3.min.js"></script>
-<script>
-graph = new Object();
+            <script>
+            graph = new Object();
 graph.nodes  = [
-                {"name":"Hub"},
-                {"name":"Client 1", "value":-56},
-                {"name":"Client 2", "value":-75}
-               ];
+{"name":"Hub"},
+{"name":"Client 1", "value":-56},
+{"name":"Client 2", "value":-75}
+];
 graph.links = [
-               {"source":1, "target":0, "value":-56},
-               {"source":graph.nodes[2], "target":0, "value":-75},
-              ];
+{"source":1, "target":0, "value":-56},
+{"source":graph.nodes[2], "target":0, "value":-75},
+];
 
-/*
-   var mon_sock = new SockJS('/monitor/{{mac}}');
-   mon_sock.onopen = function() {
-       console.log('open');
-   };
-   mon_sock.onmessage = function(e) {
-       console.log('message', e.data);
-   };
-   mon_sock.onclose = function() {
-       console.log('close');
-   };
-*/
+function find_node(mac)
+{
+        for (node in graph.nodes) {
+                if (node.name == mac)
+                        return node;
+        }
+        return null;
+};
+
+function add_node(mac, rssi)
+{
+        new_node = new Object();
+        new_node.name = mac;
+        new_node.value = rssi;
+        place = graph.nodes.push(new_node);
+
+        new_link = new Object();
+        new_link.target = graph.nodes[0];
+        new_link.value = rssi;
+        new_link.source = graph.nodes[place -1];
+        graph.links.push(new_link);
+        restart();
+}
+
+function proximity_enter(mac, rssi)
+{
+        add_node(mac, rssi);
+};
+
+function proximity_leave(mac, rssi)
+{
+
+};
+
+function proximity_change(mac, rssi)
+{
+
+};
+
+
+var mon_sock = new SockJS('/monitor/{{mac}}');
+mon_sock.onopen = function()
+{
+        console.log('open');
+};
+mon_sock.onclose = function()
+{
+        console.log('close');
+};
+mon_sock.onmessage = function(e)
+{
+        //console.log('message', e.data);
+        var msg_type = e.data['msgtype'];
+        var mac = e.data['mac'];
+        var rssi = e.data['rssi'];
+        console.log('type: '+msg_type+' mac: '+mac+' rssi: '+rssi);
+        switch (msg_type) {
+                case 'proximity-enter':
+                        proximity_enter(mac, rssi);
+                        break;
+                case 'proximity-leave':
+                        proximity_leave(mac, rssi);
+                        break;
+                case 'proximity-change':
+                        proximity_change(mac, rssi);
+                        break;
+                default:
+                        break;
+        }
+};
+
+
 </script>
 
 <script src="http://d3js.org/d3.v3.min.js"></script>
 
-</head>
-<title>{{mac}} events</title>
+            </head>
+<title> {{mac}} events</title>
 <body></body>
 <script>
 var width = 960,
@@ -55,51 +119,94 @@ var width = 960,
 var color = d3.scale.category20();
 
 var force = d3.layout.force()
-    .charge(-120)
-    .size([width, height]);
+            .charge(-120)
+            .size([width, height]);
 
 var svg = d3.select("body").append("svg")
-    .attr("width", width)
-    .attr("height", height);
-
-  force
-      .nodes(graph.nodes)
-      .links(graph.links)
-      .linkDistance(function(d, index) { return 30+(1-d.value); })
-      .start();
-
-  var link = svg.selectAll(".link")
-      .data(graph.links)
-      .enter().append("line")
-      .attr("class", "link");
-      
-
-  var node = svg.selectAll(".node")
-      .data(graph.nodes)
-      .enter().append("circle")
-      .attr("class", "node")
-      .attr("r", 15)
-      .call(force.drag);
-
-  node.append("title")
-      .text(function(d) {
-    	  if (d.value) {
-    	  	return d.name+' RSSI: '+d.value+' dbm';
-    	  } else {
-    		return d.name;
-    	  }
-    	 });
-
-  force.on("tick", function() {
-    link.attr("x1", function(d) { return d.source.x; })
-        .attr("y1", function(d) { return d.source.y; })
-        .attr("x2", function(d) { return d.target.x; })
-        .attr("y2", function(d) { return d.target.y; });
-
-    node.attr("cx", function(d) { return d.x; })
-        .attr("cy", function(d) { return d.y; });
-  });
+          .attr("width", width)
+          .attr("height", height);
 
 
+force
+.nodes(graph.nodes)
+.links(graph.links)
+.linkDistance(function(d, index)
+{
+        return 50+(1-d.value);
+})
+.start();
+
+var link = svg.selectAll(".link")
+           .data(graph.links)
+           .enter().append("line")
+           .attr("class", "link");
+
+
+var node = svg.selectAll(".node")
+           .data(graph.nodes)
+           .enter().append("circle")
+           .attr("class", "node")
+           .attr("r", 15)
+           .call(force.drag);
+
+node.append("title")
+.text(function(d)
+{
+        if (d.value) {
+                return d.name+' RSSI: '+d.value+' dbm';
+        } else {
+                return d.name;
+        }
+});
+
+force.on("tick", function()
+{
+        link.attr("x1", function(d) {
+                return d.source.x;
+        })
+        .attr("y1", function(d) {
+                return d.source.y;
+        })
+        .attr("x2", function(d) {
+                return d.target.x;
+        })
+        .attr("y2", function(d) {
+                return d.target.y;
+        });
+
+        node.attr("cx", function(d) {
+                return d.x;
+        })
+        .attr("cy", function(d) {
+                return d.y;
+        });
+});
+
+function restart()
+{
+        link = link.data(graph.links);
+
+        link.enter().insert("line", ".node")
+        .attr("class", "link");
+
+        node = node.data(graph.nodes);
+
+        node.enter().insert("circle", ".cursor")
+        .attr("class", "node")
+        .attr("r", 15)
+        .call(force.drag);
+
+        node.append("title")
+        .text(function(d) {
+                if (d.value) {
+                        return d.name+' RSSI: '+d.value+' dbm';
+                } else {
+                        return d.name;
+                }
+        });
+
+        force.start();
+        console.log('restart');
+}
 </script>
 </html>
