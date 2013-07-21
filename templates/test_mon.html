@@ -1,79 +1,100 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
-              <html>
-              <head>
-              <style>
+<html>
+<head>
+<style>
 
 .node {
-stroke:
-#fff;
-        stroke-width: 1.5px;
-fill:
-        blue;
+stroke: #fff;
+stroke-width: 1.5px;
+fill: blue;
 }
 
 .link {
-stroke:
-#999;
-stroke-opacity:
-        .6;
-
+stroke: #999;
+stroke-opacity: .6;
 }
 </style>
 <script src="http://cdn.sockjs.org/sockjs-0.3.min.js"></script>
-            <script>
-            graph = new Object();
-graph.nodes  = [
-{"name":"Hub"},
-{"name":"Client 1", "value":-56},
-{"name":"Client 2", "value":-75}
-];
-graph.links = [
-{"source":1, "target":0, "value":-56},
-{"source":graph.nodes[2], "target":0, "value":-75},
-];
+<script>
+graph = new Object();
+//graph.nodes  = [{"name":"Hub"}, {"name":"test"}];
+//graph.links = [{"source":0, "target":1, "value":-100}];
+graph.nodes  = [];
+graph.links = [];
 
-function find_node(mac)
+function find_node(name)
 {
-        for (node in graph.nodes) {
-                if (node.name == mac)
-                        return node;
-        }
-        return null;
+	for(var i = 0; i < graph.nodes.length; i++) {
+    	if (graph.nodes[i].name == name)
+        	return graph.nodes[i];
+    }
+    return null;
 };
 
-function add_node(mac, rssi)
+function add_hub(id)
 {
-        new_node = new Object();
+    var new_node = new Object();
+    new_node.name = id;
+    place = graph.nodes.push(new_node);
+
+    return new_node;
+};
+
+function add_node(hub, mac, rssi)
+{
+        var new_node = new Object();
         new_node.name = mac;
         new_node.value = rssi;
         place = graph.nodes.push(new_node);
 
-        new_link = new Object();
-        new_link.target = graph.nodes[0];
+        var new_link = new Object();
+        new_link.target = hub;
         new_link.value = rssi;
         new_link.source = graph.nodes[place -1];
         graph.links.push(new_link);
-        restart();
+        
+        new_node.link = new_link;
+
+        
+        return new_node;
 }
 
-function proximity_enter(mac, rssi)
+function proximity_enter(mon, mac, rssi)
 {
-        add_node(mac, rssi);
+	console.log('enter mon: '+mon+' mac: '+mac+' rssi: '+rssi);
+	var hub = find_node(mon);
+	if (hub == null) {
+		hub = add_hub(mon);
+	}
+    add_node(hub, mac, rssi);
+    restart();
 };
 
-function proximity_leave(mac, rssi)
+function proximity_leave(mon, mac, rssi)
 {
-
+	console.log('leave mon: '+mon+' mac: '+mac+' rssi: '+rssi);
 };
 
-function proximity_change(mac, rssi)
+function proximity_change(mon, mac, rssi)
 {
-
+	console.log('change mon: '+mon+' mac: '+mac+' rssi: '+rssi);
+	var hub = find_node(mon);
+	if (hub == null) {
+		hub = add_hub(mon);
+	}
+	var nod = find_node(mac);
+	if (nod == null) {
+		add_node(hub, mac, rssi);
+	} else {
+		nod.value = rssi;
+		nod.link.value = rssi;
+	}
+    restart();
 };
 
 
-var mon_sock = new SockJS('/monitor/{{mac}}');
+var mon_sock = new SockJS('/monitor/{{monitor}}');
 mon_sock.onopen = function()
 {
         console.log('open');
@@ -88,16 +109,17 @@ mon_sock.onmessage = function(e)
         var msg_type = e.data['msgtype'];
         var mac = e.data['mac'];
         var rssi = e.data['rssi'];
-        console.log('type: '+msg_type+' mac: '+mac+' rssi: '+rssi);
+        var mon = e.data['mon_id']
+        //console.log('mon: '+mon+' type: '+msg_type+' mac: '+mac+' rssi: '+rssi);
         switch (msg_type) {
                 case 'proximity-enter':
-                        proximity_enter(mac, rssi);
+                        proximity_enter(mon, mac, rssi);
                         break;
                 case 'proximity-leave':
-                        proximity_leave(mac, rssi);
+                        proximity_leave(mon, mac, rssi);
                         break;
                 case 'proximity-change':
-                        proximity_change(mac, rssi);
+                        proximity_change(mon, mac, rssi);
                         break;
                 default:
                         break;
@@ -109,8 +131,8 @@ mon_sock.onmessage = function(e)
 
 <script src="http://d3js.org/d3.v3.min.js"></script>
 
-            </head>
-<title> {{mac}} events</title>
+</head>
+<title> {{monitor}} events</title>
 <body></body>
 <script>
 var width = 960,
@@ -127,13 +149,11 @@ var svg = d3.select("body").append("svg")
           .attr("height", height);
 
 
-force
-.nodes(graph.nodes)
+force.nodes(graph.nodes)
 .links(graph.links)
-.linkDistance(function(d, index)
-{
+.linkDistance(function(d, index) {
         return 50+(1-d.value);
-})
+	})
 .start();
 
 var link = svg.selectAll(".link")
@@ -195,18 +215,20 @@ function restart()
         .attr("class", "node")
         .attr("r", 15)
         .call(force.drag);
-
-        node.append("title")
-        .text(function(d) {
-                if (d.value) {
-                        return d.name+' RSSI: '+d.value+' dbm';
-                } else {
-                        return d.name;
-                }
-        });
-
+		
+        node.select('title').remove();
+        node.append("title").text(function(d) {
+                    if (d.value) {
+                            return d.name+' RSSI: '+d.value+' dbm';
+                    } else {
+                            return d.name;
+                    }
+            }); 	
+        
         force.start();
-        console.log('restart');
+        //console.log('restart');
 }
+
+//proximity_enter("test", 'test', -19);
 </script>
 </html>

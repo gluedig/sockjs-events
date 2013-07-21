@@ -76,8 +76,8 @@ class MonitorEvents(SockJSConnection):
         try:
             msg_obj = json.loads(msg[0])
             logging.debug(msg_obj)
-            if self.mac != 'All':
-                if 'mac' in msg_obj and msg_obj['mac'] == self.mac:
+            if self.monitor != 'All':
+                if 'mon_id' in msg_obj and msg_obj['mon_id'] == self.monitor:
                     self.send(msg_obj)
             else:
                 self.send(msg_obj)
@@ -85,7 +85,7 @@ class MonitorEvents(SockJSConnection):
             logging.error(ex)
         
     def on_open(self, info):
-        logging.debug("Monitor ticker open: "+self.mac)
+        logging.debug("Monitor ticker open: "+self.monitor)
         zmq_socket = zmq.Context.instance().socket(zmq.SUB)
         zmq_socket.connect(zmq_local_endpoint)
         zmq_socket.setsockopt(zmq.SUBSCRIBE, '')
@@ -104,26 +104,26 @@ class MonitorGetHandler(web.RequestHandler):
         self.registered_tickers = {}
     
     def _make_ticker_class(self, **kwargs):
-        class_name = str.format("MonitorTicker_{0}", kwargs['mac'])
-        logging.debug("Monitor ticker make: "+kwargs['mac'])
+        class_name = str.format("MonitorTicker_{0}", kwargs['monitor'])
+        logging.debug("Monitor ticker make: "+kwargs['monitor'])
         return type(class_name, (MonitorEvents,), dict(**kwargs))
     
-    def _make_or_get_ticker(self, mac):
-        if mac not in self.registered_tickers:
-            srv_url = str.format('/monitor/{0}', mac)
-            TickerRouter = SockJSRouter(self._make_ticker_class(mac=mac), srv_url)
+    def _make_or_get_ticker(self, monitor):
+        if monitor not in self.registered_tickers:
+            srv_url = str.format('/monitor/{0}', monitor)
+            TickerRouter = SockJSRouter(self._make_ticker_class(monitor=monitor), srv_url)
             self.application.add_handlers(".*$", TickerRouter.urls)
-            self.registered_tickers[mac] = (TickerRouter, srv_url)
+            self.registered_tickers[monitor] = (TickerRouter, srv_url)
             return srv_url
         else:
-            return self.registered_tickers[mac][1]
+            return self.registered_tickers[monitor][1]
     
     def get(self, params):
         #logging.info(self.path_args)
         parameters = params.split('/')
         #logging.info(parameters)
-        mac = parameters[0]
-        ticker_url = self._make_or_get_ticker(mac)
+        monitor = parameters[0]
+        ticker_url = self._make_or_get_ticker(monitor)
         red_url = str.format('{0}/{1}', ticker_url, '/'.join(parameters[1:]))
         self.redirect(red_url)
 
@@ -137,7 +137,7 @@ class TestMainHandler(web.RequestHandler):
         if evtype == 'group':
             self.render("test_group.html", group=param)
         elif evtype == 'monitor':
-            self.render("test_mon.html", mac=param)
+            self.render("test_mon.html", monitor=param)
 
 zmq_test_socket = None
 
