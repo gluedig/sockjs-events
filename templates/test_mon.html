@@ -3,11 +3,9 @@
 <html>
 <head>
 <style>
-
 .node {
 stroke: #fff;
 stroke-width: 1.5px;
-fill: blue;
 }
 
 .link {
@@ -18,8 +16,6 @@ stroke-opacity: .6;
 <script src="http://cdn.sockjs.org/sockjs-0.3.min.js"></script>
 <script>
 graph = new Object();
-//graph.nodes  = [{"name":"Hub"}, {"name":"test"}];
-//graph.links = [{"source":0, "target":1, "value":-100}];
 graph.nodes  = [];
 graph.links = [];
 
@@ -36,6 +32,7 @@ function add_hub(id)
 {
     var new_node = new Object();
     new_node.name = id;
+    new_node.is_hub = true;
     place = graph.nodes.push(new_node);
 
     return new_node;
@@ -46,6 +43,7 @@ function add_node(hub, mac, rssi)
         var new_node = new Object();
         new_node.name = mac;
         new_node.value = rssi;
+        new_node.is_hub = false;
         place = graph.nodes.push(new_node);
 
         var new_link = new Object();
@@ -58,7 +56,21 @@ function add_node(hub, mac, rssi)
 
         
         return new_node;
-}
+};
+
+function remove_node(nod)
+{
+	var idx = graph.nodes.indexOf(nod);
+	graph.nodes.splice(idx,1);
+};
+
+function remove_links(nod)
+{
+	for(var i = 0; i < graph.links.length; i++) {
+		if (graph.links[i].source == nod)
+			graph.links.splice(i,1);
+	}
+};
 
 function proximity_enter(mon, mac, rssi)
 {
@@ -74,6 +86,12 @@ function proximity_enter(mon, mac, rssi)
 function proximity_leave(mon, mac, rssi)
 {
 	console.log('leave mon: '+mon+' mac: '+mac+' rssi: '+rssi);
+	var nod = find_node(mac);
+	if (nod) {
+		remove_node(nod);
+		remove_links(nod);
+		restart();
+	}
 };
 
 function proximity_change(mon, mac, rssi)
@@ -92,7 +110,6 @@ function proximity_change(mon, mac, rssi)
 	}
     restart();
 };
-
 
 var mon_sock = new SockJS('/monitor/{{monitor}}');
 mon_sock.onopen = function()
@@ -126,11 +143,8 @@ mon_sock.onmessage = function(e)
         }
 };
 
-
 </script>
-
 <script src="http://d3js.org/d3.v3.min.js"></script>
-
 </head>
 <title> {{monitor}} events</title>
 <body></body>
@@ -141,7 +155,7 @@ var width = 960,
 var color = d3.scale.category20();
 
 var force = d3.layout.force()
-            .charge(-120)
+            .charge(-150)
             .size([width, height]);
 
 var svg = d3.select("body").append("svg")
@@ -157,17 +171,10 @@ force.nodes(graph.nodes)
 .start();
 
 var link = svg.selectAll(".link")
-           .data(graph.links)
-           .enter().append("line")
-           .attr("class", "link");
-
+           .data(graph.links);
 
 var node = svg.selectAll(".node")
-           .data(graph.nodes)
-           .enter().append("circle")
-           .attr("class", "node")
-           .attr("r", 15)
-           .call(force.drag);
+           .data(graph.nodes);
 
 node.append("title")
 .text(function(d)
@@ -208,27 +215,40 @@ function restart()
 
         link.enter().insert("line", ".node")
         .attr("class", "link");
+		link.exit().remove();
 
-        node = node.data(graph.nodes);
+		node = node.data(graph.nodes);
 
         node.enter().insert("circle", ".cursor")
         .attr("class", "node")
         .attr("r", 15)
-        .call(force.drag);
-		
+        .call(force.drag)
+		.style("fill", function(d) {
+			if (d.is_hub) {
+				return 'green';
+			} else {
+				return 'blue';
+			}
+		})
+
+        node.exit().remove();
         node.select('title').remove();
         node.append("title").text(function(d) {
-                    if (d.value) {
-                            return d.name+' RSSI: '+d.value+' dbm';
-                    } else {
-                            return d.name;
-                    }
-            }); 	
+			if (d.is_hub) {
+				return d.name;
+			} else {
+				return d.name+' RSSI: '+d.value+' dbm';
+			}
+		});
         
         force.start();
         //console.log('restart');
 }
-
-//proximity_enter("test", 'test', -19);
+/*
+proximity_enter("lbbun52", 'test', -10);
+setTimeout(function(){proximity_change("lbbun52", 'test', -50)}, 5000);
+setTimeout(function(){proximity_change("lbbun52", 'test', -90)}, 10000);
+setTimeout(function(){proximity_leave("lbbun52", 'test', -90)}, 15000);
+*/
 </script>
 </html>
