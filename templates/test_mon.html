@@ -137,7 +137,6 @@ function proximity_change(mon, mac, rssi)
     restart();
 };
 
-/*
 var mon_sock = new SockJS('/monitor/{{monitor}}');
 mon_sock.onopen = function()
 {
@@ -169,7 +168,7 @@ mon_sock.onmessage = function(e)
                         break;
         }
 };
-*/
+
 </script>
 
 </head>
@@ -271,12 +270,13 @@ function restart()
         //console.log('restart');
 }
 
+/*
 proximity_enter("lbbun52", 'test', -10);
 setTimeout(function(){proximity_change("lbbun52", 'test', -50)}, 5000);
 setTimeout(function(){proximity_change("testhub", 'test', -50)}, 5500);
 setTimeout(function(){proximity_change("lbbun52", 'test', -90)}, 10000);
 setTimeout(function(){proximity_leave("lbbun52", 'test', -90)}, 15000);
 setTimeout(function(){proximity_enter("lbbun52", 'test', -80)}, 20000);
-
+*/
 </script>
 </html>
