@@ -94,7 +94,7 @@ class MonitorEvents(SockJSConnection):
         self.stream.on_recv(self._zmq_msg)
 
     def on_close(self):
-        logging.debug("Monitor ticker close: "+self.mac)
+        logging.debug("Monitor ticker close: "+self.monitor)
         self.stream.stop_on_recv()
 
 class MonitorGetHandler(web.RequestHandler):
