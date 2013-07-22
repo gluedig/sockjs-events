@@ -91,7 +91,7 @@ function remove_links(nod, hub)
 		if (nod.links[i].target == hub)
 			nod.links.splice(i,1);
 	}
-	return nod.links.lenght;
+	return nod.links.length;
 };
 
 function proximity_enter(mon, mac, rssi)
@@ -276,7 +276,8 @@ setTimeout(function(){proximity_change("lbbun52", 'test', -50)}, 5000);
 setTimeout(function(){proximity_change("testhub", 'test', -50)}, 5500);
 setTimeout(function(){proximity_change("lbbun52", 'test', -90)}, 10000);
 setTimeout(function(){proximity_leave("lbbun52", 'test', -90)}, 15000);
-setTimeout(function(){proximity_enter("lbbun52", 'test', -80)}, 20000);
+setTimeout(function(){proximity_leave("testhub", 'test', -90)}, 20000);
 */
+
 </script>
 </html>
