@@ -14,16 +14,28 @@ stroke-opacity: .6;
 }
 </style>
 <script src="http://cdn.sockjs.org/sockjs-0.3.min.js"></script>
+<script src="http://d3js.org/d3.v3.min.js"></script>
 <script>
 graph = new Object();
 graph.nodes  = [];
 graph.links = [];
+
+
 
 function find_node(name)
 {
 	for(var i = 0; i < graph.nodes.length; i++) {
     	if (graph.nodes[i].name == name)
         	return graph.nodes[i];
+    }
+    return null;
+};
+
+function find_link(hub, nod)
+{
+	for(var i = 0; i < nod.links.length; i++) {
+		if (nod.links[i].target == hub)
+			return nod.links[i];
     }
     return null;
 };
@@ -44,18 +56,23 @@ function add_node(hub, mac, rssi)
         new_node.name = mac;
         new_node.value = rssi;
         new_node.is_hub = false;
+        new_node.links = [];
         place = graph.nodes.push(new_node);
 
-        var new_link = new Object();
-        new_link.target = hub;
-        new_link.value = rssi;
-        new_link.source = graph.nodes[place -1];
-        graph.links.push(new_link);
-        
-        new_node.link = new_link;
-
-        
         return new_node;
+};
+
+function add_link(hub, node, rssi)
+{
+	var new_link = new Object();
+	new_link.source = node;
+	new_link.target = hub;
+    new_link.value = rssi;
+
+    graph.links.push(new_link);
+
+    node.links.push(new_link);
+	return new_link
 };
 
 function remove_node(nod)
@@ -64,32 +81,35 @@ function remove_node(nod)
 	graph.nodes.splice(idx,1);
 };
 
-function remove_links(nod)
+function remove_links(nod, hub)
 {
 	for(var i = 0; i < graph.links.length; i++) {
-		if (graph.links[i].source == nod)
+		if (graph.links[i].source == nod && graph.links[i].target == hub)
 			graph.links.splice(i,1);
 	}
+	for(var i = 0; i < nod.links.length; i++) {
+		if (nod.links[i].target == hub)
+			nod.links.splice(i,1);
+	}
+	return nod.links.lenght;
 };
 
 function proximity_enter(mon, mac, rssi)
 {
-	console.log('enter mon: '+mon+' mac: '+mac+' rssi: '+rssi);
-	var hub = find_node(mon);
-	if (hub == null) {
-		hub = add_hub(mon);
-	}
-    add_node(hub, mac, rssi);
-    restart();
+	//console.log('enter mon: '+mon+' mac: '+mac+' rssi: '+rssi);
+	proximity_change(mon, mac, rssi);
 };
 
 function proximity_leave(mon, mac, rssi)
 {
 	console.log('leave mon: '+mon+' mac: '+mac+' rssi: '+rssi);
 	var nod = find_node(mac);
-	if (nod) {
-		remove_node(nod);
-		remove_links(nod);
+	var hub = find_node(mon);
+	if (nod && hub) {
+		var left = remove_links(nod, hub);
+		if (left == 0) {
+			remove_node(nod);
+		}
 		restart();
 	}
 };
@@ -103,14 +123,21 @@ function proximity_change(mon, mac, rssi)
 	}
 	var nod = find_node(mac);
 	if (nod == null) {
-		add_node(hub, mac, rssi);
+		nod = add_node(hub, mac, rssi);
+		add_link(hub, nod, rssi);
 	} else {
-		nod.value = rssi;
-		nod.link.value = rssi;
+		var lnk = find_link(hub, nod);
+		if (lnk == null) {
+			add_link(hub, nod, rssi);
+		} else {
+			nod.value = rssi;
+			lnk.value = rssi;
+		}
 	}
     restart();
 };
 
+/*
 var mon_sock = new SockJS('/monitor/{{monitor}}');
 mon_sock.onopen = function()
 {
@@ -142,25 +169,24 @@ mon_sock.onmessage = function(e)
                         break;
         }
 };
-
+*/
 </script>
-<script src="http://d3js.org/d3.v3.min.js"></script>
+
 </head>
 <title> {{monitor}} events</title>
 <body></body>
 <script>
-var width = 960,
-    height = 500;
+var width = 960, height = 500;
 
 var color = d3.scale.category20();
 
 var force = d3.layout.force()
-            .charge(-150)
-            .size([width, height]);
+        .charge(-150)
+        .size([width, height]);
 
 var svg = d3.select("body").append("svg")
-          .attr("width", width)
-          .attr("height", height);
+      .attr("width", width)
+      .attr("height", height);
 
 
 force.nodes(graph.nodes)
@@ -244,11 +270,13 @@ function restart()
         force.start();
         //console.log('restart');
 }
-/*
+
 proximity_enter("lbbun52", 'test', -10);
 setTimeout(function(){proximity_change("lbbun52", 'test', -50)}, 5000);
+setTimeout(function(){proximity_change("testhub", 'test', -50)}, 5500);
 setTimeout(function(){proximity_change("lbbun52", 'test', -90)}, 10000);
 setTimeout(function(){proximity_leave("lbbun52", 'test', -90)}, 15000);
-*/
+setTimeout(function(){proximity_enter("lbbun52", 'test', -80)}, 20000);
+
 </script>
 </html>
