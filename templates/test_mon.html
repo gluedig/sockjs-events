@@ -2,6 +2,7 @@
 <meta charset="utf-8">
 <html>
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 .node {
 stroke: #fff;
@@ -14,6 +15,7 @@ stroke-opacity: .6;
 stroke-width: 1.5px;
 }
 </style>
+<script src="http://code.jquery.com/jquery-2.0.3.min.js"></script>
 <script src="http://cdn.sockjs.org/sockjs-0.3.min.js"></script>
 <script src="http://d3js.org/d3.v3.min.js"></script>
 </head>
@@ -25,53 +27,51 @@ var graph = new Object();
 graph.nodes  = [];
 graph.links = [];
 
-var width = 960, height = 600;
+var width = window.innerWidth, height = window.innerHeight;
 
 var color = d3.scale.category20();
 
 var force = d3.layout.force()
-        .charge(-150)
-        .size([width, height]);
+	.charge(-500)
+	.size([width, height]);
 
 var svg = d3.select("body").append("svg")
-      .attr("width", width)
-      .attr("height", height);
-var img_pattern = svg.append("defs").append("pattern")
-	.attr("id", "img_hub")
+	.attr("width", width)
+	.attr("height", height);
+      
+var svg_defs = svg.append("defs");
+
+function add_svg_pattern(id, url) {
+	var _img_pattern = svg_defs.append("pattern")
+	.attr("id", id)
 	.attr("x", 0)
 	.attr("y", 0)
 	.attr("patternUnits", "objectBoundingBox")
 	.attr("height", 60)
 	.attr("width", 60);
-img_pattern.append("image")
+	_img_pattern.append("image")
 	.attr("x", 0)
 	.attr("y", 0)
 	.attr("height", 60)
 	.attr("width", 60)
-	.attr("xlink:href", "http://www.sunwardmedia.com/images/5.png");
+	.attr("xlink:href", url);
+	
+}
+add_svg_pattern('img_hub', "http://www.sunwardmedia.com/images/5.png");
+add_svg_pattern('img_mm', "http://www.gravatar.com/avatar/0?d=mm");
 
 force.nodes(graph.nodes)
-.links(graph.links)
-.linkDistance(function(d, index) {
+	.links(graph.links)
+	.linkDistance(function(d, index) {
         return 100+(1-d.value);
 	})
-.start();
+	.start();
 
 var link = svg.selectAll(".link")
-           .data(graph.links);
+	.data(graph.links);
 
 var node = svg.selectAll(".node")
-           .data(graph.nodes);
-
-node.append("title")
-.text(function(d)
-{
-        if (d.value) {
-                return d.name+' RSSI: '+d.value+' dbm';
-        } else {
-                return d.name;
-        }
-});
+	.data(graph.nodes);
 
 force.on("tick", function()
 {
@@ -107,6 +107,7 @@ function restart()
 		node = node.data(graph.nodes);
 
         node.enter().insert("circle", ".cursor")
+        .attr("id", function(d) { return d.id})
         .attr("class", "node")
         .attr("r", 30)
         .call(force.drag)
@@ -114,7 +115,11 @@ function restart()
 			if (d.is_hub) {
 				return "url(#img_hub)";
 			} else {
-				return 'blue';
+				if (d.img != "") {
+					return "url(#"+d.img+")";
+				} else { 
+					return "url(#img_mm)";
+				}
 			}
 		})
 
@@ -132,10 +137,42 @@ function restart()
         //console.log('restart');
 }
 
-function find_node(name)
+function find_user(node) {
+	$.ajax({
+		url: "http://localhost:5000/user/find",
+		context: document.body,
+		dataType: 'jsonp',
+		data: {'id':node.mac}
+	})
+	.success(function(data, status, jqxhr) {
+		resp = jqxhr.responseJSON[0];
+		//console.log(resp)
+		if (resp.image != "") { 
+			node.img = 'img_'+node.name;
+			add_svg_pattern(node.img, resp.image);
+			node_id = '#'+node.id;
+			svg_node = svg.select(node_id)
+			svg_node.style("fill", "url(#"+node.img+")");
+		}
+		node.name = resp.email
+	});
+}
+
+function find_node(mac)
 {
 	for(var i = 0; i < graph.nodes.length; i++) {
-    	if (graph.nodes[i].name == name)
+		var _node = graph.nodes[i];
+    	if (!_node.is_hub  && _node.mac == mac)
+        	return graph.nodes[i];
+    }
+    return null;
+};
+
+function find_hub(name)
+{
+	for(var i = 0; i < graph.nodes.length; i++) {
+		var _node = graph.nodes[i];
+    	if (_node.is_hub  && _node.name == name)
         	return graph.nodes[i];
     }
     return null;
@@ -154,22 +191,26 @@ function add_hub(id)
 {
     var new_node = new Object();
     new_node.name = id;
+    new_node.id = id;
     new_node.is_hub = true;
     place = graph.nodes.push(new_node);
-
+	
     return new_node;
 };
 
 function add_node(hub, mac, rssi)
-{
-        var new_node = new Object();
-        new_node.name = mac;
-        new_node.value = rssi;
-        new_node.is_hub = false;
-        new_node.links = [];
-        place = graph.nodes.push(new_node);
-
-        return new_node;
+{		
+	var new_node = new Object();
+	new_node.name = mac;
+	new_node.mac = mac;
+	new_node.value = rssi;
+	new_node.is_hub = false;
+	new_node.img = "";
+	new_node.id = "client"+mac.replace(/:/g,'_')
+	new_node.links = [];
+	place = graph.nodes.push(new_node);
+	find_user(new_node);
+	return new_node;
 };
 
 function add_link(hub, node, rssi)
@@ -214,7 +255,7 @@ function proximity_leave(mon, mac, rssi)
 {
 	console.log('leave mon: '+mon+' mac: '+mac+' rssi: '+rssi);
 	var nod = find_node(mac);
-	var hub = find_node(mon);
+	var hub = find_hub(mon);
 	if (nod && hub) {
 		var left = remove_links(nod, hub);
 		if (left == 0) {
@@ -227,7 +268,7 @@ function proximity_leave(mon, mac, rssi)
 function proximity_change(mon, mac, rssi)
 {
 	console.log('change mon: '+mon+' mac: '+mac+' rssi: '+rssi);
-	var hub = find_node(mon);
+	var hub = find_hub(mon);
 	if (hub == null) {
 		hub = add_hub(mon);
 	}
@@ -278,11 +319,13 @@ mon_sock.onmessage = function(e)
                         break;
         }
 };
+
+
 /*
-proximity_enter("lbbun52", 'test', -10);
-setTimeout(function(){proximity_change("lbbun52", 'test', -50)}, 5000);
-setTimeout(function(){proximity_change("lbbun52", 'test', -90)}, 10000);
-setTimeout(function(){proximity_leave("lbbun52", 'test', -90)}, 15000);
+setTimeout(function(){proximity_enter("lbbun52", '0c:77:1a:c9:fd:90', -10)}, 1000);
+setTimeout(function(){proximity_change("lbbun52", '0c:77:1a:c9:fd:90', -50)}, 5000);
+setTimeout(function(){proximity_change("lbbun52", '0c:77:1a:c9:fd:90', -90)}, 10000);
+setTimeout(function(){proximity_leave("lbbun52", '0c:77:1a:c9:fd:90', -90)}, 15000);
 */
 </script>
 </html>
