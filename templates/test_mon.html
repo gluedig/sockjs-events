@@ -139,7 +139,7 @@ function restart()
 
 function find_user(node) {
 	$.ajax({
-		url: "http://localhost:5000/user/find",
+		url: "{{url}}/user/find",
 		context: document.body,
 		dataType: 'jsonp',
 		data: {'id':node.mac}

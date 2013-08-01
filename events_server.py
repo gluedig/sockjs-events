@@ -14,6 +14,7 @@ zmq.eventloop.ioloop.gen_log = logging.getLogger()
 zmq.eventloop.ioloop.os = os
 
 zmq_local_endpoint = "inproc://#events"
+service_url = "http://gluedig.dnsd.info:443"
 
 class GroupEvents(SockJSConnection):
     def _zmq_msg(self, msg):
@@ -135,9 +136,9 @@ class MonitorGetHandler(web.RequestHandler):
 class TestMainHandler(web.RequestHandler):
     def get(self, evtype, param):
         if evtype == 'group':
-            self.render("test_group.html", group=param)
+            self.render("test_group.html", group=param, url=service_url)
         elif evtype == 'monitor':
-            self.render("test_mon.html", monitor=param)
+            self.render("test_mon.html", monitor=param, url=service_url)
 
 zmq_test_socket = None
 
@@ -164,20 +165,24 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--test_page', help='provide test page', action='store_true')
     parser.add_argument('--test_sender', help='provide test sender', action='store_true')
+    parser.add_argument('--debug', help='print debug info', action='store_true', default=False)
     parser.add_argument('--port', help='application port default: %(default)s', default=8081, type=int)
+    parser.add_argument('--url', help='test pages service url: %(default)s', default=service_url)
     parser.add_argument('remote', nargs='?', help='ZMQ event source endpoint default: %(default)s', default="tcp://localhost:5555")
 
     args = parser.parse_args()
     
     logging.getLogger().setLevel(logging.INFO)
-    
+    if args.debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+
     handlers = [("/monitor/(.+)", MonitorGetHandler),
                 ("/group/(.+)", GroupGetHandler)]
     
+    service_url = args.url
     
     if args.test_sender:
-        logging.getLogger().setLevel(logging.DEBUG)
-        logging.debug("Running with test sender")
+        logging.info("Running with test sender")
         zmq_test_socket = zmq.Context.instance().socket(zmq.PUB)
         zmq_test_socket.bind(zmq_local_endpoint)
         test_handlers = [
@@ -186,8 +191,7 @@ if __name__ == '__main__':
         handlers += test_handlers
     else:
         if args.test_page:
-            logging.getLogger().setLevel(logging.DEBUG)
-            logging.debug("Running with test page")
+            logging.info("Running with test page")
             handlers += [("/test/(.+)/(.+)", TestMainHandler)]
             
         logging.info("Connecting to ZMQ endpoint: "+args.remote)
@@ -198,7 +202,7 @@ if __name__ == '__main__':
         pd.start()
     
     app = web.Application(handlers,
-                          debug=(True if args.test_page or args.test_sender else False),
+                          debug=args.debug,
                           template_path="templates")
 
     app.listen(args.port)
